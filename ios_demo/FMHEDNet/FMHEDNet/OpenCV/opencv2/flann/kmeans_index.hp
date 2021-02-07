@@ -1,0 +1,966 @@
+/***********************************************************************
+ * Software License Agreement (BSD License)
+ *
+ * Copyright 2008-2009  Marius Muja (mariusm@cs.ubc.ca). All rights reserved.
+ * Copyright 2008-2009  David G. Lowe (lowe@cs.ubc.ca). All rights reserved.
+ *
+ * THE BSD LICENSE
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *************************************************************************/
+
+ #define OPENCV_FLANN_KMEANS_INDEX_H_    
+
+#include <algorithm>
+#include <string>
+#include <map>
+#include <cassert>
+#include <limits>
+#include <cmath>
+
+#include "general.h"
+#include "nn_index.h"
+#include "dist.h"
+#include "matrix.h"
+#include "result_set.h"
+#include "heap.h"
+#include "allocator.h"
+#include "random.h"
+#include "saving.h"
+#include "logger.h"
+
+
+namespace cvflann
+{
+
+struct KMeansIndexParams : public IndexParams
+{
+ KMeansIndexParams(int branching = 32, int iterations = 11,
+flann_centers_init_t centers_init = FLANN_CENTERS_RANDOM, float cb_index = 0.2 )
+{
+ (*this)["algorithm"] = FLANN_INDEX_KMEANS;
+
+(*this)["branching"] = branching;
+ 
+(*this)["iterations"] = iterations;
+ 
+(*this)["centers_init"] = centers_init;
+ 
+(*this)["cb_index"] = cb_index;
+}
+};
+
+
+ 
+template <typename Distance>
+class KMeansIndex : public NNIndex<Distance>
+{
+public:
+typedef typename Distance::ElementType ElementType;
+typedef typename Distance::ResultType DistanceType;
+
+
+
+ typedef void (KMeansIndex::* centersAlgFunction)(int, int*, int, int*, int&);
+
+ 
+centersAlgFunction chooseCenters;
+
+
+
+ 
+void chooseCentersRandom(int k, int* indices, int indices_length, int* centers, int& centers_length)
+{
+ UniqueRandom r(indices_length);
+
+ int index;
+for (index=0; index<k; ++index) {
+bool duplicate = true;
+int rnd;
+while (duplicate) {
+duplicate = false;
+rnd = r.next();
+if (rnd<0) {
+centers_length = index;
+return;
+}
+
+ centers[index] = indices[rnd];
+
+ for (int j=0; j<index; ++j) {
+DistanceType sq = distance_(dataset_[centers[index]], dataset_[centers[j]], dataset_.cols);
+if (sq<1e-16) {
+duplicate = true;
+}
+}
+}
+}
+
+ centers_length = index;
+}
+
+
+ 
+void chooseCentersGonzales(int k, int* indices, int indices_length, int* centers, int& centers_length)
+{
+ int n = indices_length;
+
+ int rnd = rand_int(n);
+assert(rnd >=0 && rnd < n);
+
+ centers[0] = indices[rnd];
+
+ int index;
+for (index=1; index<k; ++index) {
+
+ int best_index = -1;
+DistanceType best_val = 0;
+for (int j=0; j<n; ++j) {
+DistanceType dist = distance_(dataset_[centers[0]],dataset_[indices[j]],dataset_.cols);
+for (int i=1; i<index; ++i) {
+DistanceType tmp_dist = distance_(dataset_[centers[i]],dataset_[indices[j]],dataset_.cols);
+if (tmp_dist<dist) {
+dist = tmp_dist;
+}
+}
+if (dist>best_val) {
+best_val = dist;
+best_index = j;
+}
+}
+if (best_index!=-1) {
+centers[index] = indices[best_index];
+}
+else {
+break;
+}
+}
+centers_length = index;
+}
+
+
+ 
+void chooseCentersKMeanspp(int k, int* indices, int indices_length, int* centers, int& centers_length)
+{
+ int n = indices_length;
+
+ double currentPot = 0;
+DistanceType* closestDistSq = new DistanceType[n];
+
+ 
+int index = rand_int(n);
+assert(index >=0 && index < n);
+centers[0] = indices[index];
+
+ for (int i = 0; i < n; i++) {
+closestDistSq[i] = distance_(dataset_[indices[i]], dataset_[indices[index]], dataset_.cols);
+closestDistSq[i] = ensureSquareDistance<Distance>( closestDistSq[i] );
+currentPot += closestDistSq[i];
+}
+
+
+ const int numLocalTries = 1;
+
+ 
+int centerCount;
+for (centerCount = 1; centerCount < k; centerCount++) {
+
+ 
+double bestNewPot = -1;
+int bestNewIndex = -1;
+for (int localTrial = 0; localTrial < numLocalTries; localTrial++) {
+
+ 
+
+double randVal = rand_double(currentPot);
+for (index = 0; index < n-1; index++) {
+if (randVal <= closestDistSq[index]) break;
+else randVal -= closestDistSq[index];
+}
+
+ 
+double newPot = 0;
+for (int i = 0; i < n; i++) {
+DistanceType dist = distance_(dataset_[indices[i]], dataset_[indices[index]], dataset_.cols);
+newPot += std::min( ensureSquareDistance<Distance>(dist), closestDistSq[i] );
+}
+
+ 
+if ((bestNewPot < 0)||(newPot < bestNewPot)) {
+bestNewPot = newPot;
+bestNewIndex = index;
+}
+}
+
+ 
+centers[centerCount] = indices[bestNewIndex];
+currentPot = bestNewPot;
+for (int i = 0; i < n; i++) {
+DistanceType dist = distance_(dataset_[indices[i]], dataset_[indices[bestNewIndex]], dataset_.cols);
+closestDistSq[i] = std::min( ensureSquareDistance<Distance>(dist), closestDistSq[i] );
+}
+}
+
+ centers_length = centerCount;
+
+ delete[] closestDistSq;
+}
+
+
+
+public:
+
+ flann_algorithm_t getType() const
+{
+ return FLANN_INDEX_KMEANS;
+}
+
+ 
+KMeansIndex(const Matrix<ElementType>& inputData, const IndexParams& params = KMeansIndexParams(),
+Distance d = Distance())
+: dataset_(inputData), index_params_(params), root_(NULL), indices_(NULL), distance_(d)
+{
+ memoryCounter_ = 0;
+
+ size_ = dataset_.rows;
+veclen_ = dataset_.cols;
+
+ branching_ = get_param(params,"branching",32);
+iterations_ = get_param(params,"iterations",11);
+if (iterations_<0) {
+iterations_ = (std::numeric_limits<int>::max)();
+}
+centers_init_ = get_param(params,"centers_init",FLANN_CENTERS_RANDOM);
+
+ if (centers_init_==FLANN_CENTERS_RANDOM) {
+chooseCenters = &KMeansIndex::chooseCentersRandom;
+}
+else if (centers_init_==FLANN_CENTERS_GONZALES) {
+chooseCenters = &KMeansIndex::chooseCentersGonzales;
+}
+else if (centers_init_==FLANN_CENTERS_KMEANSPP) {
+chooseCenters = &KMeansIndex::chooseCentersKMeanspp;
+}
+else {
+throw FLANNException("Unknown algorithm for choosing initial centers.");
+}
+cb_index_ = 0.4f;
+
+ }
+
+
+ KMeansIndex(const KMeansIndex&);
+KMeansIndex& operator=(const KMeansIndex&);
+
+
+ 
+virtual KMeansIndex()
+{
+ if (root_ != NULL) {
+free_centers(root_);
+}
+if (indices_!=NULL) {
+delete[] indices_;
+}
+}
+
+ 
+size_t size() const
+{
+ return size_;
+}
+
+ 
+size_t veclen() const
+{
+ return veclen_;
+}
+
+
+ void set_cb_index( float index)
+{
+ cb_index_ = index;
+}
+
+ 
+int usedMemory() const
+{
+ return pool_.usedMemory+pool_.wastedMemory+memoryCounter_;
+}
+
+ 
+void addIndex(const Matrix<ElementType>& , const Matrix<ElementType>& )
+{
+}
+
+ 
+void buildIndex()
+{
+ if (branching_<2) {
+throw FLANNException("Branching factor must be at least 2");
+}
+
+ indices_ = new int[size_];
+for (size_t i=0; i<size_; ++i) {
+indices_[i] = int(i);
+}
+
+ root_ = pool_.allocate<KMeansNode>();
+std::memset(root_, 0, sizeof(KMeansNode));
+
+ computeNodeStatistics(root_, indices_, (int)size_);
+computeClustering(root_, indices_, (int)size_, branching_,0);
+}
+
+
+ void saveIndex(FILE* stream)
+{
+ save_value(stream, branching_);
+save_value(stream, iterations_);
+save_value(stream, memoryCounter_);
+save_value(stream, cb_index_);
+save_value(stream, *indices_, (int)size_);
+
+ save_tree(stream, root_);
+}
+
+
+ void loadIndex(FILE* stream)
+{
+ load_value(stream, branching_);
+load_value(stream, iterations_);
+load_value(stream, memoryCounter_);
+load_value(stream, cb_index_);
+if (indices_!=NULL) {
+delete[] indices_;
+}
+indices_ = new int[size_];
+load_value(stream, *indices_, size_);
+
+ if (root_!=NULL) {
+free_centers(root_);
+}
+load_tree(stream, root_);
+
+ index_params_["algorithm"] = getType();
+index_params_["branching"] = branching_;
+index_params_["iterations"] = iterations_;
+index_params_["centers_init"] = centers_init_;
+index_params_["cb_index"] = cb_index_;
+
+ }
+
+
+ 
+void findNeighbors(ResultSet<DistanceType>& result, const ElementType* vec, const SearchParams& searchParams)
+{
+
+ int maxChecks = get_param(searchParams,"checks",32);
+
+ if (maxChecks==FLANN_CHECKS_UNLIMITED) {
+findExactNN(root_, result, vec);
+}
+else {
+ 
+Heap<BranchSt>* heap = new Heap<BranchSt>((int)size_);
+
+ int checks = 0;
+findNN(root_, result, vec, checks, maxChecks, heap);
+
+ BranchSt branch;
+while (heap->popMin(branch) && (checks<maxChecks || !result.full())) {
+KMeansNodePtr node = branch.node;
+findNN(node, result, vec, checks, maxChecks, heap);
+}
+assert(result.full());
+
+ delete heap;
+}
+
+ }
+
+ 
+int getClusterCenters(Matrix<DistanceType>& centers)
+{
+ int numClusters = centers.rows;
+if (numClusters<1) {
+throw FLANNException("Number of clusters must be at least 1");
+}
+
+ DistanceType variance;
+KMeansNodePtr* clusters = new KMeansNodePtr[numClusters];
+
+ int clusterCount = getMinVarianceClusters(root_, clusters, numClusters, variance);
+
+ Logger::info("Clusters requested: %d, returning %d\n",numClusters, clusterCount);
+
+ for (int i=0; i<clusterCount; ++i) {
+DistanceType* center = clusters[i]->pivot;
+for (size_t j=0; j<veclen_; ++j) {
+centers[i][j] = center[j];
+}
+}
+delete[] clusters;
+
+ return clusterCount;
+}
+
+ IndexParams getParameters() const
+{
+ return index_params_;
+}
+
+
+private:
+
+struct KMeansNode
+{
+ 
+DistanceType* pivot;
+
+DistanceType radius;
+
+DistanceType mean_radius;
+
+DistanceType variance;
+
+int size;
+
+KMeansNode** childs;
+
+int* indices;
+
+int level;
+};
+typedef KMeansNode* KMeansNodePtr;
+
+ 
+typedef BranchStruct<KMeansNodePtr, DistanceType> BranchSt;
+
+
+
+
+ void save_tree(FILE* stream, KMeansNodePtr node)
+{
+ save_value(stream, *node);
+save_value(stream, *(node->pivot), (int)veclen_);
+if (node->childs==NULL) {
+int indices_offset = (int)(node->indices - indices_);
+save_value(stream, indices_offset);
+}
+else {
+for(int i=0; i<branching_; ++i) {
+save_tree(stream, node->childs[i]);
+}
+}
+}
+
+
+ void load_tree(FILE* stream, KMeansNodePtr& node)
+{
+ node = pool_.allocate<KMeansNode>();
+load_value(stream, *node);
+node->pivot = new DistanceType[veclen_];
+load_value(stream, *(node->pivot), (int)veclen_);
+if (node->childs==NULL) {
+int indices_offset;
+load_value(stream, indices_offset);
+node->indices = indices_ + indices_offset;
+}
+else {
+node->childs = pool_.allocate<KMeansNodePtr>(branching_);
+for(int i=0; i<branching_; ++i) {
+load_tree(stream, node->childs[i]);
+}
+}
+}
+
+
+ 
+void free_centers(KMeansNodePtr node)
+{
+ delete[] node->pivot;
+if (node->childs!=NULL) {
+for (int k=0; k<branching_; ++k) {
+free_centers(node->childs[k]);
+}
+}
+}
+
+ 
+void computeNodeStatistics(KMeansNodePtr node, int* indices, int indices_length)
+{
+
+ DistanceType radius = 0;
+DistanceType variance = 0;
+DistanceType* mean = new DistanceType[veclen_];
+memoryCounter_ += int(veclen_*sizeof(DistanceType));
+
+ memset(mean,0,veclen_*sizeof(DistanceType));
+
+ for (size_t i=0; i<size_; ++i) {
+ElementType* vec = dataset_[indices[i]];
+for (size_t j=0; j<veclen_; ++j) {
+mean[j] += vec[j];
+}
+variance += distance_(vec, ZeroIterator<ElementType>(), veclen_);
+}
+for (size_t j=0; j<veclen_; ++j) {
+mean[j] /= size_;
+}
+variance /= size_;
+variance -= distance_(mean, ZeroIterator<ElementType>(), veclen_);
+
+ DistanceType tmp = 0;
+for (int i=0; i<indices_length; ++i) {
+tmp = distance_(mean, dataset_[indices[i]], veclen_);
+if (tmp>radius) {
+radius = tmp;
+}
+}
+
+ node->variance = variance;
+node->radius = radius;
+node->pivot = mean;
+}
+
+
+ 
+void computeClustering(KMeansNodePtr node, int* indices, int indices_length, int branching, int level)
+{
+ node->size = indices_length;
+node->level = level;
+
+ if (indices_length < branching) {
+node->indices = indices;
+std::sort(node->indices,node->indices+indices_length);
+node->childs = NULL;
+return;
+}
+
+ int* centers_idx = new int[branching];
+int centers_length;
+(this->*chooseCenters)(branching, indices, indices_length, centers_idx, centers_length);
+
+ if (centers_length<branching) {
+node->indices = indices;
+std::sort(node->indices,node->indices+indices_length);
+node->childs = NULL;
+delete [] centers_idx;
+return;
+}
+
+
+ Matrix<double> dcenters(new double[branching*veclen_],branching,veclen_);
+for (int i=0; i<centers_length; ++i) {
+ElementType* vec = dataset_[centers_idx[i]];
+for (size_t k=0; k<veclen_; ++k) {
+dcenters[i][k] = double(vec[k]);
+}
+}
+delete[] centers_idx;
+
+ std::vector<DistanceType> radiuses(branching);
+int* count = new int[branching];
+for (int i=0; i<branching; ++i) {
+radiuses[i] = 0;
+count[i] = 0;
+}
+
+ 
+int* belongs_to = new int[indices_length];
+for (int i=0; i<indices_length; ++i) {
+
+ DistanceType sq_dist = distance_(dataset_[indices[i]], dcenters[0], veclen_);
+belongs_to[i] = 0;
+for (int j=1; j<branching; ++j) {
+DistanceType new_sq_dist = distance_(dataset_[indices[i]], dcenters[j], veclen_);
+if (sq_dist>new_sq_dist) {
+belongs_to[i] = j;
+sq_dist = new_sq_dist;
+}
+}
+if (sq_dist>radiuses[belongs_to[i]]) {
+radiuses[belongs_to[i]] = sq_dist;
+}
+count[belongs_to[i]]++;
+}
+
+ bool converged = false;
+int iteration = 0;
+while (!converged && iteration<iterations_) {
+converged = true;
+iteration++;
+
+ 
+for (int i=0; i<branching; ++i) {
+memset(dcenters[i],0,sizeof(double)*veclen_);
+radiuses[i] = 0;
+}
+for (int i=0; i<indices_length; ++i) {
+ElementType* vec = dataset_[indices[i]];
+double* center = dcenters[belongs_to[i]];
+for (size_t k=0; k<veclen_; ++k) {
+center[k] += vec[k];
+}
+}
+for (int i=0; i<branching; ++i) {
+int cnt = count[i];
+for (size_t k=0; k<veclen_; ++k) {
+dcenters[i][k] /= cnt;
+}
+}
+
+ 
+for (int i=0; i<indices_length; ++i) {
+DistanceType sq_dist = distance_(dataset_[indices[i]], dcenters[0], veclen_);
+int new_centroid = 0;
+for (int j=1; j<branching; ++j) {
+DistanceType new_sq_dist = distance_(dataset_[indices[i]], dcenters[j], veclen_);
+if (sq_dist>new_sq_dist) {
+new_centroid = j;
+sq_dist = new_sq_dist;
+}
+}
+if (sq_dist>radiuses[new_centroid]) {
+radiuses[new_centroid] = sq_dist;
+}
+if (new_centroid != belongs_to[i]) {
+count[belongs_to[i]]--;
+count[new_centroid]++;
+belongs_to[i] = new_centroid;
+
+ converged = false;
+}
+}
+
+ for (int i=0; i<branching; ++i) {
+ 
+
+if (count[i]==0) {
+int j = (i+1)%branching;
+while (count[j]<=1) {
+j = (j+1)%branching;
+}
+
+ for (int k=0; k<indices_length; ++k) {
+if (belongs_to[k]==j) {
+ 
+if ( distance_(dataset_[indices[k]], dcenters[j], veclen_) == radiuses[j] ) {
+belongs_to[k] = i;
+count[j]--;
+count[i]++;
+break;
+}
+}
+}
+converged = false;
+}
+}
+
+ }
+
+ DistanceType** centers = new DistanceType*[branching];
+
+ for (int i=0; i<branching; ++i) {
+centers[i] = new DistanceType[veclen_];
+memoryCounter_ += (int)(veclen_*sizeof(DistanceType));
+for (size_t k=0; k<veclen_; ++k) {
+centers[i][k] = (DistanceType)dcenters[i][k];
+}
+}
+
+
+ 
+node->childs = pool_.allocate<KMeansNodePtr>(branching);
+int start = 0;
+int end = start;
+for (int c=0; c<branching; ++c) {
+int s = count[c];
+
+ DistanceType variance = 0;
+DistanceType mean_radius =0;
+for (int i=0; i<indices_length; ++i) {
+if (belongs_to[i]==c) {
+DistanceType d = distance_(dataset_[indices[i]], ZeroIterator<ElementType>(), veclen_);
+variance += d;
+mean_radius += sqrt(d);
+std::swap(indices[i],indices[end]);
+std::swap(belongs_to[i],belongs_to[end]);
+end++;
+}
+}
+variance /= s;
+mean_radius /= s;
+variance -= distance_(centers[c], ZeroIterator<ElementType>(), veclen_);
+
+ node->childs[c] = pool_.allocate<KMeansNode>();
+std::memset(node->childs[c], 0, sizeof(KMeansNode));
+node->childs[c]->radius = radiuses[c];
+node->childs[c]->pivot = centers[c];
+node->childs[c]->variance = variance;
+node->childs[c]->mean_radius = mean_radius;
+computeClustering(node->childs[c],indices+start, end-start, branching, level+1);
+start=end;
+}
+
+ delete[] dcenters.data;
+delete[] centers;
+delete[] count;
+delete[] belongs_to;
+}
+
+
+
+ 
+
+
+ void findNN(KMeansNodePtr node, ResultSet<DistanceType>& result, const ElementType* vec, int& checks, int maxChecks,
+Heap<BranchSt>* heap)
+{
+ 
+{
+ DistanceType bsq = distance_(vec, node->pivot, veclen_);
+DistanceType rsq = node->radius;
+DistanceType wsq = result.worstDist();
+
+ DistanceType val = bsq-rsq-wsq;
+DistanceType val2 = val*val-4*rsq*wsq;
+
+ 
+if ((val>0)&&(val2>0)) {
+return;
+}
+}
+
+ if (node->childs==NULL) {
+if (checks>=maxChecks) {
+if (result.full()) return;
+}
+checks += node->size;
+for (int i=0; i<node->size; ++i) {
+int index = node->indices[i];
+DistanceType dist = distance_(dataset_[index], vec, veclen_);
+result.addPoint(dist, index);
+}
+}
+else {
+DistanceType* domain_distances = new DistanceType[branching_];
+int closest_center = exploreNodeBranches(node, vec, domain_distances, heap);
+delete[] domain_distances;
+findNN(node->childs[closest_center],result,vec, checks, maxChecks, heap);
+}
+}
+
+ 
+int exploreNodeBranches(KMeansNodePtr node, const ElementType* q, DistanceType* domain_distances, Heap<BranchSt>* heap)
+{
+
+ int best_index = 0;
+domain_distances[best_index] = distance_(q, node->childs[best_index]->pivot, veclen_);
+for (int i=1; i<branching_; ++i) {
+domain_distances[i] = distance_(q, node->childs[i]->pivot, veclen_);
+if (domain_distances[i]<domain_distances[best_index]) {
+best_index = i;
+}
+}
+
+ 
+for (int i=0; i<branching_; ++i) {
+if (i != best_index) {
+domain_distances[i] -= cb_index_*node->childs[i]->variance;
+
+ 
+
+
+
+heap->insert(BranchSt(node->childs[i],domain_distances[i]));
+}
+}
+
+ return best_index;
+}
+
+
+ 
+void findExactNN(KMeansNodePtr node, ResultSet<DistanceType>& result, const ElementType* vec)
+{
+ 
+{
+ DistanceType bsq = distance_(vec, node->pivot, veclen_);
+DistanceType rsq = node->radius;
+DistanceType wsq = result.worstDist();
+
+ DistanceType val = bsq-rsq-wsq;
+DistanceType val2 = val*val-4*rsq*wsq;
+
+ 
+if ((val>0)&&(val2>0)) {
+return;
+}
+}
+
+
+ if (node->childs==NULL) {
+for (int i=0; i<node->size; ++i) {
+int index = node->indices[i];
+DistanceType dist = distance_(dataset_[index], vec, veclen_);
+result.addPoint(dist, index);
+}
+}
+else {
+int* sort_indices = new int[branching_];
+
+ getCenterOrdering(node, vec, sort_indices);
+
+ for (int i=0; i<branching_; ++i) {
+findExactNN(node->childs[sort_indices[i]],result,vec);
+}
+
+ delete[] sort_indices;
+}
+}
+
+
+ 
+void getCenterOrdering(KMeansNodePtr node, const ElementType* q, int* sort_indices)
+{
+ DistanceType* domain_distances = new DistanceType[branching_];
+for (int i=0; i<branching_; ++i) {
+DistanceType dist = distance_(q, node->childs[i]->pivot, veclen_);
+
+ int j=0;
+while (domain_distances[j]<dist && j<i) j++;
+for (int k=i; k>j; --k) {
+domain_distances[k] = domain_distances[k-1];
+sort_indices[k] = sort_indices[k-1];
+}
+domain_distances[j] = dist;
+sort_indices[j] = i;
+}
+delete[] domain_distances;
+}
+
+ 
+DistanceType getDistanceToBorder(DistanceType* p, DistanceType* c, DistanceType* q)
+{
+ DistanceType sum = 0;
+DistanceType sum2 = 0;
+
+ for (int i=0; i<veclen_; ++i) {
+DistanceType t = c[i]-p[i];
+sum += t*(q[i]-(c[i]+p[i])/2);
+sum2 += t*t;
+}
+
+ return sum*sum/sum2;
+}
+
+
+ 
+int getMinVarianceClusters(KMeansNodePtr root, KMeansNodePtr* clusters, int clusters_length, DistanceType& varianceValue)
+{
+ int clusterCount = 1;
+clusters[0] = root;
+
+ DistanceType meanVariance = root->variance*root->size;
+
+ while (clusterCount<clusters_length) {
+DistanceType minVariance = (std::numeric_limits<DistanceType>::max)();
+int splitIndex = -1;
+
+ for (int i=0; i<clusterCount; ++i) {
+if (clusters[i]->childs != NULL) {
+
+ DistanceType variance = meanVariance - clusters[i]->variance*clusters[i]->size;
+
+ for (int j=0; j<branching_; ++j) {
+variance += clusters[i]->childs[j]->variance*clusters[i]->childs[j]->size;
+}
+if (variance<minVariance) {
+minVariance = variance;
+splitIndex = i;
+}
+}
+}
+
+ if (splitIndex==-1) break;
+if ( (branching_+clusterCount-1) > clusters_length) break;
+
+ meanVariance = minVariance;
+
+ 
+KMeansNodePtr toSplit = clusters[splitIndex];
+clusters[splitIndex] = toSplit->childs[0];
+for (int i=1; i<branching_; ++i) {
+clusters[clusterCount++] = toSplit->childs[i];
+}
+}
+
+ varianceValue = meanVariance/root->size;
+return clusterCount;
+}
+
+private:
+ 
+int branching_;
+
+ 
+int iterations_;
+
+ 
+flann_centers_init_t centers_init_;
+
+ 
+float cb_index_;
+
+ 
+const Matrix<ElementType> dataset_;
+
+ 
+IndexParams index_params_;
+
+ 
+size_t size_;
+
+ 
+size_t veclen_;
+
+ 
+KMeansNodePtr root_;
+
+ 
+int* indices_;
+
+ 
+Distance distance_;
+
+ 
+PooledAllocator pool_;
+
+ 
+int memoryCounter_;
+};
+
+}
+
+ 

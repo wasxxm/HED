@@ -1,0 +1,642 @@
+/*M///////////////////////////////////////////////////////////////////////////////////////
+//
+//  IMPORTANT: READ BEFORE DOWNLOADING, COPYING, INSTALLING OR USING.
+//
+//  By downloading, copying, installing or using the software you agree to this license.
+//  If you do not agree to this license, do not download, install,
+//  copy or use the software.
+//
+//
+//                        Intel License Agreement
+//                For Open Source Computer Vision Library
+//
+// Copyright (C) 2000, Intel Corporation, all rights reserved.
+// Third party copyrights are property of their respective owners.
+//
+// Redistribution and use in source and binary forms, with or without modification,
+// are permitted provided that the following conditions are met:
+//
+//   * Redistribution's of source code must retain the above copyright notice,
+//     this list of conditions and the following disclaimer.
+//
+//   * Redistribution's in binary form must reproduce the above copyright notice,
+//     this list of conditions and the following disclaimer in the documentation
+//     and/or other materials provided with the distribution.
+//
+//   * The name of Intel Corporation may not be used to endorse or promote products
+//     derived from this software without specific prior written permission.
+//
+// This software is provided by the copyright holders and contributors "as is" and
+// any express or implied warranties, including, but not limited to, the implied
+// warranties of merchantability and fitness for a particular purpose are disclaimed.
+// In no event shall the Intel Corporation or contributors be liable for any direct,
+// indirect, incidental, special, exemplary, or consequential damages
+// (including, but not limited to, procurement of substitute goods or services;
+// loss of use, data, or profits; or business interruption) however caused
+// and on any theory of liability, whether in contract, strict liability,
+// or tort (including negligence or otherwise) arising in any way out of
+// the use of this software, even if advised of the possibility of such damage.
+//
+//M*/
+
+ #define __OPENCV_HIGHGUI_H__    
+
+#include "opencv2/core/core_c.h"
+
+ #ifdef __cplusplus  
+ extern "C" {
+  #endif  
+
+ 
+
+ 
+
+enum { CV_FONT_LIGHT = 25, 
+CV_FONT_NORMAL = 50, 
+CV_FONT_DEMIBOLD = 63, 
+CV_FONT_BOLD = 75, 
+CV_FONT_BLACK = 87 
+};
+
+enum { CV_STYLE_NORMAL = 0, 
+CV_STYLE_ITALIC = 1, 
+CV_STYLE_OBLIQUE = 2 
+};
+ 
+
+ 
+
+CVAPI(CvFont) cvFontQt(const char* nameFont, int pointSize CV_DEFAULT(-1), CvScalar color CV_DEFAULT(cvScalarAll(0)), int weight CV_DEFAULT(CV_FONT_NORMAL), int style CV_DEFAULT(CV_STYLE_NORMAL), int spacing CV_DEFAULT(0));
+
+CVAPI(void) cvAddText(const CvArr* img, const char* text, CvPoint org, CvFont *arg2);
+
+CVAPI(void) cvDisplayOverlay(const char* name, const char* text, int delayms CV_DEFAULT(0));
+CVAPI(void) cvDisplayStatusBar(const char* name, const char* text, int delayms CV_DEFAULT(0));
+
+CVAPI(void) cvSaveWindowParameters(const char* name);
+CVAPI(void) cvLoadWindowParameters(const char* name);
+CVAPI(int) cvStartLoop(int (*pt2Func)(int argc, char *argv[]), int argc, char* argv[]);
+CVAPI(void) cvStopLoop( void );
+
+typedef void (CV_CDECL *CvButtonCallback)(int state, void* userdata);
+enum {CV_PUSH_BUTTON = 0, CV_CHECKBOX = 1, CV_RADIOBOX = 2};
+CVAPI(int) cvCreateButton( const char* button_name CV_DEFAULT(NULL),CvButtonCallback on_change CV_DEFAULT(NULL), void* userdata CV_DEFAULT(NULL) , int button_type CV_DEFAULT(CV_PUSH_BUTTON), int initial_button_state CV_DEFAULT(0));
+
+
+
+ 
+CVAPI(int) cvInitSystem( int argc, char** argv );
+
+CVAPI(int) cvStartWindowThread( void );
+
+ 
+enum
+{
+ 
+CV_WND_PROP_FULLSCREEN = 0, 
+CV_WND_PROP_AUTOSIZE = 1, 
+CV_WND_PROP_ASPECTRATIO= 2, 
+CV_WND_PROP_OPENGL = 3, 
+
+ 
+CV_WINDOW_NORMAL = 0x00000000, 
+CV_WINDOW_AUTOSIZE = 0x00000001, 
+CV_WINDOW_OPENGL = 0x00001000, 
+
+ 
+CV_GUI_EXPANDED = 0x00000000, 
+CV_GUI_NORMAL = 0x00000010, 
+
+ 
+CV_WINDOW_FULLSCREEN = 1, 
+CV_WINDOW_FREERATIO = 0x00000100, 
+CV_WINDOW_KEEPRATIO = 0x00000000 
+};
+
+ 
+CVAPI(int) cvNamedWindow( const char* name, int flags CV_DEFAULT(CV_WINDOW_AUTOSIZE) );
+
+ 
+CVAPI(void) cvSetWindowProperty(const char* name, int prop_id, double prop_value);
+CVAPI(double) cvGetWindowProperty(const char* name, int prop_id);
+
+ 
+CVAPI(void) cvShowImage( const char* name, const CvArr* image );
+
+ 
+CVAPI(void) cvResizeWindow( const char* name, int width, int height );
+CVAPI(void) cvMoveWindow( const char* name, int x, int y );
+
+
+ 
+CVAPI(void) cvDestroyWindow( const char* name );
+
+CVAPI(void) cvDestroyAllWindows(void);
+
+ 
+CVAPI(void*) cvGetWindowHandle( const char* name );
+
+ 
+CVAPI(const char*) cvGetWindowName( void* window_handle );
+
+
+typedef void (CV_CDECL *CvTrackbarCallback)(int pos);
+
+ 
+CVAPI(int) cvCreateTrackbar( const char* trackbar_name, const char* window_name,
+int* value, int count, CvTrackbarCallback on_change CV_DEFAULT(NULL));
+
+typedef void (CV_CDECL *CvTrackbarCallback2)(int pos, void* userdata);
+
+CVAPI(int) cvCreateTrackbar2( const char* trackbar_name, const char* window_name,
+int* value, int count, CvTrackbarCallback2 on_change,
+void* userdata CV_DEFAULT(0));
+
+ 
+CVAPI(int) cvGetTrackbarPos( const char* trackbar_name, const char* window_name );
+CVAPI(void) cvSetTrackbarPos( const char* trackbar_name, const char* window_name, int pos );
+CVAPI(void) cvSetTrackbarMax(const char* trackbar_name, const char* window_name, int maxval);
+
+enum
+{
+ CV_EVENT_MOUSEMOVE =0,
+CV_EVENT_LBUTTONDOWN =1,
+CV_EVENT_RBUTTONDOWN =2,
+CV_EVENT_MBUTTONDOWN =3,
+CV_EVENT_LBUTTONUP =4,
+CV_EVENT_RBUTTONUP =5,
+CV_EVENT_MBUTTONUP =6,
+CV_EVENT_LBUTTONDBLCLK =7,
+CV_EVENT_RBUTTONDBLCLK =8,
+CV_EVENT_MBUTTONDBLCLK =9
+};
+
+enum
+{
+ CV_EVENT_FLAG_LBUTTON =1,
+CV_EVENT_FLAG_RBUTTON =2,
+CV_EVENT_FLAG_MBUTTON =4,
+CV_EVENT_FLAG_CTRLKEY =8,
+CV_EVENT_FLAG_SHIFTKEY =16,
+CV_EVENT_FLAG_ALTKEY =32
+};
+
+typedef void (CV_CDECL *CvMouseCallback )(int event, int x, int y, int flags, void* param);
+
+ 
+CVAPI(void) cvSetMouseCallback( const char* window_name, CvMouseCallback on_mouse,
+void* param CV_DEFAULT(NULL));
+
+enum
+{
+ 
+CV_LOAD_IMAGE_UNCHANGED =-1,
+
+CV_LOAD_IMAGE_GRAYSCALE =0,
+
+CV_LOAD_IMAGE_COLOR =1,
+
+CV_LOAD_IMAGE_ANYDEPTH =2,
+
+CV_LOAD_IMAGE_ANYCOLOR =4
+};
+
+ 
+CVAPI(IplImage*) cvLoadImage( const char* filename, int iscolor CV_DEFAULT(CV_LOAD_IMAGE_COLOR));
+CVAPI(CvMat*) cvLoadImageM( const char* filename, int iscolor CV_DEFAULT(CV_LOAD_IMAGE_COLOR));
+
+enum
+{
+ CV_IMWRITE_JPEG_QUALITY =1,
+CV_IMWRITE_PNG_COMPRESSION =16,
+CV_IMWRITE_PNG_STRATEGY =17,
+CV_IMWRITE_PNG_BILEVEL =18,
+CV_IMWRITE_PNG_STRATEGY_DEFAULT =0,
+CV_IMWRITE_PNG_STRATEGY_FILTERED =1,
+CV_IMWRITE_PNG_STRATEGY_HUFFMAN_ONLY =2,
+CV_IMWRITE_PNG_STRATEGY_RLE =3,
+CV_IMWRITE_PNG_STRATEGY_FIXED =4,
+CV_IMWRITE_PXM_BINARY =32
+};
+
+ 
+CVAPI(int) cvSaveImage( const char* filename, const CvArr* image,
+const int* params CV_DEFAULT(0) );
+
+ 
+CVAPI(IplImage*) cvDecodeImage( const CvMat* buf, int iscolor CV_DEFAULT(CV_LOAD_IMAGE_COLOR));
+CVAPI(CvMat*) cvDecodeImageM( const CvMat* buf, int iscolor CV_DEFAULT(CV_LOAD_IMAGE_COLOR));
+
+ 
+CVAPI(CvMat*) cvEncodeImage( const char* ext, const CvArr* image,
+const int* params CV_DEFAULT(0) );
+
+enum
+{
+ CV_CVTIMG_FLIP =1,
+CV_CVTIMG_SWAP_RB =2
+};
+
+ 
+CVAPI(void) cvConvertImage( const CvArr* src, CvArr* dst, int flags CV_DEFAULT(0));
+
+ 
+CVAPI(int) cvWaitKey(int delay CV_DEFAULT(0));
+
+ 
+
+typedef void (CV_CDECL *CvOpenGlDrawCallback)(void* userdata);
+CVAPI(void) cvSetOpenGlDrawCallback(const char* window_name, CvOpenGlDrawCallback callback, void* userdata CV_DEFAULT(NULL));
+
+CVAPI(void) cvSetOpenGlContext(const char* window_name);
+CVAPI(void) cvUpdateWindow(const char* window_name);
+
+
+ 
+
+ 
+typedef struct CvCapture CvCapture;
+
+ 
+CVAPI(CvCapture*) cvCreateFileCapture( const char* filename );
+
+enum
+{
+ CV_CAP_ANY =0, 
+
+ CV_CAP_MIL =100, 
+
+ CV_CAP_VFW =200, 
+CV_CAP_V4L =200,
+CV_CAP_V4L2 =200,
+
+ CV_CAP_FIREWARE =300, 
+CV_CAP_FIREWIRE =300,
+CV_CAP_IEEE1394 =300,
+CV_CAP_DC1394 =300,
+CV_CAP_CMU1394 =300,
+
+ CV_CAP_STEREO =400, 
+CV_CAP_TYZX =400,
+CV_TYZX_LEFT =400,
+CV_TYZX_RIGHT =401,
+CV_TYZX_COLOR =402,
+CV_TYZX_Z =403,
+
+ CV_CAP_QT =500, 
+
+ CV_CAP_UNICAP =600, 
+
+ CV_CAP_DSHOW =700, 
+CV_CAP_MSMF =1400, 
+
+ CV_CAP_PVAPI =800, 
+
+ CV_CAP_OPENNI =900, 
+CV_CAP_OPENNI_ASUS =910, 
+
+ CV_CAP_ANDROID =1000, 
+CV_CAP_ANDROID_BACK =CV_CAP_ANDROID+99, 
+CV_CAP_ANDROID_FRONT =CV_CAP_ANDROID+98, 
+
+ CV_CAP_XIAPI =1100, 
+
+ CV_CAP_AVFOUNDATION = 1200, 
+
+ CV_CAP_GIGANETIX = 1300, 
+
+ CV_CAP_INTELPERC = 1500 
+};
+
+ 
+CVAPI(CvCapture*) cvCreateCameraCapture( int index );
+
+ 
+CVAPI(int) cvGrabFrame( CvCapture* capture );
+
+ 
+CVAPI(IplImage*) cvRetrieveFrame( CvCapture* capture, int streamIdx CV_DEFAULT(0) );
+
+ 
+CVAPI(IplImage*) cvQueryFrame( CvCapture* capture );
+
+ 
+CVAPI(void) cvReleaseCapture( CvCapture** capture );
+
+enum
+{
+ 
+
+CV_CAP_PROP_DC1394_OFF = -4, 
+CV_CAP_PROP_DC1394_MODE_MANUAL = -3, 
+CV_CAP_PROP_DC1394_MODE_AUTO = -2,
+CV_CAP_PROP_DC1394_MODE_ONE_PUSH_AUTO = -1,
+CV_CAP_PROP_POS_MSEC =0,
+CV_CAP_PROP_POS_FRAMES =1,
+CV_CAP_PROP_POS_AVI_RATIO =2,
+CV_CAP_PROP_FRAME_WIDTH =3,
+CV_CAP_PROP_FRAME_HEIGHT =4,
+CV_CAP_PROP_FPS =5,
+CV_CAP_PROP_FOURCC =6,
+CV_CAP_PROP_FRAME_COUNT =7,
+CV_CAP_PROP_FORMAT =8,
+CV_CAP_PROP_MODE =9,
+CV_CAP_PROP_BRIGHTNESS =10,
+CV_CAP_PROP_CONTRAST =11,
+CV_CAP_PROP_SATURATION =12,
+CV_CAP_PROP_HUE =13,
+CV_CAP_PROP_GAIN =14,
+CV_CAP_PROP_EXPOSURE =15,
+CV_CAP_PROP_CONVERT_RGB =16,
+CV_CAP_PROP_WHITE_BALANCE_U =17,
+CV_CAP_PROP_RECTIFICATION =18,
+CV_CAP_PROP_MONOCROME =19,
+CV_CAP_PROP_SHARPNESS =20,
+CV_CAP_PROP_AUTO_EXPOSURE =21, 
+
+
+CV_CAP_PROP_GAMMA =22,
+CV_CAP_PROP_TEMPERATURE =23,
+CV_CAP_PROP_TRIGGER =24,
+CV_CAP_PROP_TRIGGER_DELAY =25,
+CV_CAP_PROP_WHITE_BALANCE_V =26,
+CV_CAP_PROP_ZOOM =27,
+CV_CAP_PROP_FOCUS =28,
+CV_CAP_PROP_GUID =29,
+CV_CAP_PROP_ISO_SPEED =30,
+CV_CAP_PROP_MAX_DC1394 =31,
+CV_CAP_PROP_BACKLIGHT =32,
+CV_CAP_PROP_PAN =33,
+CV_CAP_PROP_TILT =34,
+CV_CAP_PROP_ROLL =35,
+CV_CAP_PROP_IRIS =36,
+CV_CAP_PROP_SETTINGS =37,
+CV_CAP_PROP_BUFFERSIZE =38,
+
+ CV_CAP_PROP_AUTOGRAB =1024, 
+CV_CAP_PROP_SUPPORTED_PREVIEW_SIZES_STRING=1025, 
+CV_CAP_PROP_PREVIEW_FORMAT=1026, 
+
+ 
+CV_CAP_OPENNI_DEPTH_GENERATOR = 1 << 31,
+CV_CAP_OPENNI_IMAGE_GENERATOR = 1 << 30,
+CV_CAP_OPENNI_GENERATORS_MASK = CV_CAP_OPENNI_DEPTH_GENERATOR + CV_CAP_OPENNI_IMAGE_GENERATOR,
+
+ 
+CV_CAP_PROP_OPENNI_OUTPUT_MODE = 100,
+CV_CAP_PROP_OPENNI_FRAME_MAX_DEPTH = 101, 
+CV_CAP_PROP_OPENNI_BASELINE = 102, 
+CV_CAP_PROP_OPENNI_FOCAL_LENGTH = 103, 
+CV_CAP_PROP_OPENNI_REGISTRATION = 104, 
+CV_CAP_PROP_OPENNI_REGISTRATION_ON = CV_CAP_PROP_OPENNI_REGISTRATION, 
+ 
+
+CV_CAP_PROP_OPENNI_APPROX_FRAME_SYNC = 105,
+CV_CAP_PROP_OPENNI_MAX_BUFFER_SIZE = 106,
+CV_CAP_PROP_OPENNI_CIRCLE_BUFFER = 107,
+CV_CAP_PROP_OPENNI_MAX_TIME_DURATION = 108,
+
+ CV_CAP_PROP_OPENNI_GENERATOR_PRESENT = 109,
+
+ CV_CAP_OPENNI_IMAGE_GENERATOR_PRESENT = CV_CAP_OPENNI_IMAGE_GENERATOR + CV_CAP_PROP_OPENNI_GENERATOR_PRESENT,
+CV_CAP_OPENNI_IMAGE_GENERATOR_OUTPUT_MODE = CV_CAP_OPENNI_IMAGE_GENERATOR + CV_CAP_PROP_OPENNI_OUTPUT_MODE,
+CV_CAP_OPENNI_DEPTH_GENERATOR_BASELINE = CV_CAP_OPENNI_DEPTH_GENERATOR + CV_CAP_PROP_OPENNI_BASELINE,
+CV_CAP_OPENNI_DEPTH_GENERATOR_FOCAL_LENGTH = CV_CAP_OPENNI_DEPTH_GENERATOR + CV_CAP_PROP_OPENNI_FOCAL_LENGTH,
+CV_CAP_OPENNI_DEPTH_GENERATOR_REGISTRATION = CV_CAP_OPENNI_DEPTH_GENERATOR + CV_CAP_PROP_OPENNI_REGISTRATION,
+CV_CAP_OPENNI_DEPTH_GENERATOR_REGISTRATION_ON = CV_CAP_OPENNI_DEPTH_GENERATOR_REGISTRATION,
+
+ 
+CV_CAP_GSTREAMER_QUEUE_LENGTH = 200, 
+
+ 
+CV_CAP_PROP_PVAPI_MULTICASTIP = 300, 
+CV_CAP_PROP_PVAPI_FRAMESTARTTRIGGERMODE = 301, 
+CV_CAP_PROP_PVAPI_DECIMATIONHORIZONTAL = 302, 
+CV_CAP_PROP_PVAPI_DECIMATIONVERTICAL = 303, 
+CV_CAP_PROP_PVAPI_BINNINGX = 304, 
+CV_CAP_PROP_PVAPI_BINNINGY = 305, 
+CV_CAP_PROP_PVAPI_PIXELFORMAT = 306, 
+
+ 
+CV_CAP_PROP_XI_DOWNSAMPLING = 400, 
+CV_CAP_PROP_XI_DATA_FORMAT = 401, 
+CV_CAP_PROP_XI_OFFSET_X = 402, 
+CV_CAP_PROP_XI_OFFSET_Y = 403, 
+CV_CAP_PROP_XI_TRG_SOURCE = 404, 
+CV_CAP_PROP_XI_TRG_SOFTWARE = 405, 
+CV_CAP_PROP_XI_GPI_SELECTOR = 406, 
+CV_CAP_PROP_XI_GPI_MODE = 407, 
+CV_CAP_PROP_XI_GPI_LEVEL = 408, 
+CV_CAP_PROP_XI_GPO_SELECTOR = 409, 
+CV_CAP_PROP_XI_GPO_MODE = 410, 
+CV_CAP_PROP_XI_LED_SELECTOR = 411, 
+CV_CAP_PROP_XI_LED_MODE = 412, 
+CV_CAP_PROP_XI_MANUAL_WB = 413, 
+CV_CAP_PROP_XI_AUTO_WB = 414, 
+CV_CAP_PROP_XI_AEAG = 415, 
+CV_CAP_PROP_XI_EXP_PRIORITY = 416, 
+CV_CAP_PROP_XI_AE_MAX_LIMIT = 417, 
+CV_CAP_PROP_XI_AG_MAX_LIMIT = 418, 
+CV_CAP_PROP_XI_AEAG_LEVEL = 419, 
+CV_CAP_PROP_XI_TIMEOUT = 420, 
+
+ 
+CV_CAP_PROP_ANDROID_FLASH_MODE = 8001,
+CV_CAP_PROP_ANDROID_FOCUS_MODE = 8002,
+CV_CAP_PROP_ANDROID_WHITE_BALANCE = 8003,
+CV_CAP_PROP_ANDROID_ANTIBANDING = 8004,
+CV_CAP_PROP_ANDROID_FOCAL_LENGTH = 8005,
+CV_CAP_PROP_ANDROID_FOCUS_DISTANCE_NEAR = 8006,
+CV_CAP_PROP_ANDROID_FOCUS_DISTANCE_OPTIMAL = 8007,
+CV_CAP_PROP_ANDROID_FOCUS_DISTANCE_FAR = 8008,
+CV_CAP_PROP_ANDROID_EXPOSE_LOCK = 8009,
+CV_CAP_PROP_ANDROID_WHITEBALANCE_LOCK = 8010,
+
+ 
+CV_CAP_PROP_IOS_DEVICE_FOCUS = 9001,
+CV_CAP_PROP_IOS_DEVICE_EXPOSURE = 9002,
+CV_CAP_PROP_IOS_DEVICE_FLASH = 9003,
+CV_CAP_PROP_IOS_DEVICE_WHITEBALANCE = 9004,
+CV_CAP_PROP_IOS_DEVICE_TORCH = 9005,
+
+ 
+
+CV_CAP_PROP_GIGA_FRAME_OFFSET_X = 10001,
+CV_CAP_PROP_GIGA_FRAME_OFFSET_Y = 10002,
+CV_CAP_PROP_GIGA_FRAME_WIDTH_MAX = 10003,
+CV_CAP_PROP_GIGA_FRAME_HEIGH_MAX = 10004,
+CV_CAP_PROP_GIGA_FRAME_SENS_WIDTH = 10005,
+CV_CAP_PROP_GIGA_FRAME_SENS_HEIGH = 10006,
+
+ CV_CAP_PROP_INTELPERC_PROFILE_COUNT = 11001,
+CV_CAP_PROP_INTELPERC_PROFILE_IDX = 11002,
+CV_CAP_PROP_INTELPERC_DEPTH_LOW_CONFIDENCE_VALUE = 11003,
+CV_CAP_PROP_INTELPERC_DEPTH_SATURATION_VALUE = 11004,
+CV_CAP_PROP_INTELPERC_DEPTH_CONFIDENCE_THRESHOLD = 11005,
+CV_CAP_PROP_INTELPERC_DEPTH_FOCAL_LENGTH_HORZ = 11006,
+CV_CAP_PROP_INTELPERC_DEPTH_FOCAL_LENGTH_VERT = 11007,
+
+ 
+CV_CAP_INTELPERC_DEPTH_GENERATOR = 1 << 29,
+CV_CAP_INTELPERC_IMAGE_GENERATOR = 1 << 28,
+CV_CAP_INTELPERC_GENERATORS_MASK = CV_CAP_INTELPERC_DEPTH_GENERATOR + CV_CAP_INTELPERC_IMAGE_GENERATOR
+};
+
+enum
+{
+ 
+CV_CAP_OPENNI_DEPTH_MAP = 0, 
+CV_CAP_OPENNI_POINT_CLOUD_MAP = 1, 
+CV_CAP_OPENNI_DISPARITY_MAP = 2, 
+CV_CAP_OPENNI_DISPARITY_MAP_32F = 3, 
+CV_CAP_OPENNI_VALID_DEPTH_MASK = 4, 
+
+ 
+CV_CAP_OPENNI_BGR_IMAGE = 5,
+CV_CAP_OPENNI_GRAY_IMAGE = 6
+};
+
+ 
+enum
+{
+ CV_CAP_OPENNI_VGA_30HZ = 0,
+CV_CAP_OPENNI_SXGA_15HZ = 1,
+CV_CAP_OPENNI_SXGA_30HZ = 2,
+CV_CAP_OPENNI_QVGA_30HZ = 3,
+CV_CAP_OPENNI_QVGA_60HZ = 4
+};
+
+ 
+enum
+{
+ CV_CAP_ANDROID_COLOR_FRAME_BGR = 0, 
+CV_CAP_ANDROID_COLOR_FRAME = CV_CAP_ANDROID_COLOR_FRAME_BGR,
+CV_CAP_ANDROID_GREY_FRAME = 1, 
+CV_CAP_ANDROID_COLOR_FRAME_RGB = 2,
+CV_CAP_ANDROID_COLOR_FRAME_BGRA = 3,
+CV_CAP_ANDROID_COLOR_FRAME_RGBA = 4
+};
+
+ 
+enum
+{
+ CV_CAP_ANDROID_FLASH_MODE_AUTO = 0,
+CV_CAP_ANDROID_FLASH_MODE_OFF,
+CV_CAP_ANDROID_FLASH_MODE_ON,
+CV_CAP_ANDROID_FLASH_MODE_RED_EYE,
+CV_CAP_ANDROID_FLASH_MODE_TORCH
+};
+
+ 
+enum
+{
+ CV_CAP_ANDROID_FOCUS_MODE_AUTO = 0,
+CV_CAP_ANDROID_FOCUS_MODE_CONTINUOUS_PICTURE,
+CV_CAP_ANDROID_FOCUS_MODE_CONTINUOUS_VIDEO,
+CV_CAP_ANDROID_FOCUS_MODE_EDOF,
+CV_CAP_ANDROID_FOCUS_MODE_FIXED,
+CV_CAP_ANDROID_FOCUS_MODE_INFINITY,
+CV_CAP_ANDROID_FOCUS_MODE_MACRO
+};
+
+ 
+enum
+{
+ CV_CAP_ANDROID_WHITE_BALANCE_AUTO = 0,
+CV_CAP_ANDROID_WHITE_BALANCE_CLOUDY_DAYLIGHT,
+CV_CAP_ANDROID_WHITE_BALANCE_DAYLIGHT,
+CV_CAP_ANDROID_WHITE_BALANCE_FLUORESCENT,
+CV_CAP_ANDROID_WHITE_BALANCE_INCANDESCENT,
+CV_CAP_ANDROID_WHITE_BALANCE_SHADE,
+CV_CAP_ANDROID_WHITE_BALANCE_TWILIGHT,
+CV_CAP_ANDROID_WHITE_BALANCE_WARM_FLUORESCENT
+};
+
+ 
+enum
+{
+ CV_CAP_ANDROID_ANTIBANDING_50HZ = 0,
+CV_CAP_ANDROID_ANTIBANDING_60HZ,
+CV_CAP_ANDROID_ANTIBANDING_AUTO,
+CV_CAP_ANDROID_ANTIBANDING_OFF
+};
+
+enum
+{
+ CV_CAP_INTELPERC_DEPTH_MAP = 0, 
+CV_CAP_INTELPERC_UVDEPTH_MAP = 1, 
+CV_CAP_INTELPERC_IR_MAP = 2, 
+CV_CAP_INTELPERC_IMAGE = 3
+};
+
+ 
+CVAPI(double) cvGetCaptureProperty( CvCapture* capture, int property_id );
+CVAPI(int) cvSetCaptureProperty( CvCapture* capture, int property_id, double value );
+
+ 
+CVAPI(int) cvGetCaptureDomain( CvCapture* capture);
+
+ 
+typedef struct CvVideoWriter CvVideoWriter;
+
+ #define CV_FOURCC_MACRO  ( c1  , c2  , c3  , c4  )   (((c1) & 255) + (((c2) & 255) << 8) + (((c3) & 255) << 16) + (((c4) & 255) << 24))   
+
+CV_INLINE int CV_FOURCC(char c1, char c2, char c3, char c4)
+{
+ return CV_FOURCC_MACRO(c1, c2, c3, c4);
+}
+
+ #define CV_FOURCC_PROMPT   -1   
+ #define CV_FOURCC_DEFAULT   CV_FOURCC(   
+
+ 
+CVAPI(CvVideoWriter*) cvCreateVideoWriter( const char* filename, int fourcc,
+double fps, CvSize frame_size,
+int is_color CV_DEFAULT(1));
+
+ 
+ 
+
+ 
+CVAPI(int) cvWriteFrame( CvVideoWriter* writer, const IplImage* image );
+
+ 
+CVAPI(void) cvReleaseVideoWriter( CvVideoWriter** writer );
+
+ 
+
+ #define cvCaptureFromFile   cvCreateFileCapture   
+ #define cvCaptureFromCAM   cvCreateCameraCapture  
+ #define cvCaptureFromAVI   cvCaptureFromFile  
+ #define cvCreateAVIWriter   cvCreateVideoWriter   
+ #define cvWriteToAVI   cvWriteFrame  
+ #define cvAddSearchPath  ( path  )   
+ #define cvvInitSystem   cvInitSystem   
+ #define cvvNamedWindow   cvNamedWindow   
+ #define cvvShowImage   cvShowImage  
+ #define cvvResizeWindow   cvResizeWindow   
+ #define cvvDestroyWindow   cvDestroyWindow   
+ #define cvvCreateTrackbar   cvCreateTrackbar   
+ #define cvvLoadImage  ( name  )   cvLoadImage((name),1)   
+ #define cvvSaveImage   cvSaveImage  
+ #define cvvAddSearchPath   cvAddSearchPath   
+ #define cvvWaitKey  ( name  )   cvWaitKey(0)  
+ #define cvvWaitKeyEx  ( name  , delay  )   cvWaitKey(delay)   
+ #define cvvConvertImage   cvConvertImage  
+ #define HG_AUTOSIZE   CV_WINDOW_AUTOSIZE  
+ #define set_preprocess_func   cvSetPreprocessFuncWin32   
+ #define set_postprocess_func   cvSetPostprocessFuncWin32   
+
+#if#if defined WIN32 || defined _WIN32
+
+CVAPI(void) cvSetPreprocessFuncWin32_(const void* callback);
+CVAPI(void) cvSetPostprocessFuncWin32_(const void* callback);
+ #define cvSetPreprocessFuncWin32  ( callback  )   cvSetPreprocessFuncWin32_((const void*)(callback))   
+ #define cvSetPostprocessFuncWin32  ( callback  )   cvSetPostprocessFuncWin32_((const void*)(callback))   
+
+ 
+#ifdef __cplusplus
+}
+#endif
+
+#endif
