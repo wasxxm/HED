@@ -1,4 +1,5 @@
 import cv2
+import imutils as imutils
 import numpy as np
 import helper
 from configs import *
@@ -14,12 +15,19 @@ bg_img_resized = helper.resize_img(bg_img, IMAGE_WIDTH, IMAGE_HEIGHT)
 rect_img = cv2.imread(RECT_IMG_PATH + "credit_cards05.jpg", 1)
 rect_img = helper.add_alpha(rect_img)
 # display("Rect", rect_img)
+
 rect_img_resized = helper.resize_img(rect_img, 248)
 # display_org("RectRes", rect_img_resized)
 
-output = helper.blur_img_edges(rect_img_resized, BLUR_EDGE_RADIUS)
+output = helper.blur_img_edges(rect_img_resized, 3)
+helper.save_img(output, BASE_PATH + "1.png")
 
 helper.display_org("Blur", output)
+
+# output = imutils.rotate_bound(output, 90)
+output = helper.img_change_perspective2(output, distort_upper=100)
+helper.save_img(output, BASE_PATH + "2.png")
+helper.display("Distort", output)
 # helper.save_img(output, BASE_PATH + "1.png")
 
 # merged_img = overlay_img(bg_img_resized, output, 15, 15)

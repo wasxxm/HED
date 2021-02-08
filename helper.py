@@ -1,9 +1,9 @@
+import cv2
+import numpy as np
 from PIL import Image
 from PIL import ImageDraw
 from PIL import ImageFilter
-import cv2
-import numpy as np
-from configs import *
+import subprocess
 
 
 def display(frame_name, img):
@@ -18,6 +18,13 @@ def display(frame_name, img):
 def display_org(frame_name, img):
     cv2.imshow(frame_name, img)
     cv2.waitKey(0)
+
+
+def rotate_img(image, angle):
+    image_center = tuple(np.array(image.shape[1::-1]) / 2)
+    rot_mat = cv2.getRotationMatrix2D(image_center, angle, 1.0)
+    result = cv2.warpAffine(image, rot_mat, image.shape[1::-1], flags=cv2.INTER_LINEAR)
+    return result
 
 
 def resize_img(image, width=None, height=None, inter=cv2.INTER_AREA):
@@ -66,7 +73,7 @@ def blur_img_edges(input_img, radius=6):
 
     # Paste image on white background
     diam = 2 * radius
-    back = Image.new('RGBA', (im.size[0] + diam, im.size[1] + diam), (255, 255, 255, 0))
+    back = Image.new('RGBA', (im.size[0] + diam, im.size[1] + diam), (50, 50, 50, 0))
     back.paste(im, (radius, radius))
 
     # Create paste mask
@@ -134,3 +141,36 @@ def overlay_transparent(background, overlay, x, y):
 
     background[y:y + h, x:x + w] = (1.0 - mask) * background[y:y + h, x:x + w] + mask * overlay_image
     return background
+
+
+def find_coeffs(pa, pb):
+    matrix = []
+    for p1, p2 in zip(pa, pb):
+        matrix.append([p1[0], p1[1], 1, 0, 0, 0, -p2[0] * p1[0], -p2[0] * p1[1]])
+        matrix.append([0, 0, 0, p1[0], p1[1], 1, -p2[1] * p1[0], -p2[1] * p1[1]])
+
+    a = np.matrix(matrix, dtype=np.float)
+    b = np.array(pb).reshape(8)
+
+    res = np.dot(np.linalg.inv(a.T * a) * a.T, b)
+    return np.array(res).reshape(8)
+
+
+def img_change_perspective(src_img):
+    img = cv2pil(src_img)
+    width, height = img.size
+    m = -0.5
+    xshift = abs(m) * width
+    new_width = width + int(round(xshift))
+    img = img.transform((new_width, height), Image.AFFINE, (1, m, -xshift if m > 0 else 0, 0, 1, 0), Image.BICUBIC)
+    return pil2cv(img)
+
+
+def img_change_perspective2(src_img, distort_upper=150):
+    input_img = "temp/input.png"
+    output_img = "temp/output.png"
+    distort_upper = str(distort_upper)
+    save_img(src_img, input_img)
+    cmd = "magick " + input_img + " -virtual-pixel transparent +distort Perspective \"0,0,0,0  %[fx:w-1],0,%[fx:w-1],0  0,%[fx:h-1],-" + distort_upper + ",%[fx:h-1]  %[fx:w-1],%[fx:h-1],%[fx:w+" + distort_upper + "],%[fx:h-1]\" " + output_img
+    subprocess.call(cmd, shell=True)
+    return cv2.imread(output_img, cv2.IMREAD_UNCHANGED)
