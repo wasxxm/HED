@@ -1,11 +1,13 @@
 BASE_PATH = "sample_images/"
 BG_IMG_PATH = BASE_PATH + "background_images/"
 RECT_IMG_PATH = BASE_PATH + "rect_images/"
+BG_IMG_PATH_TEST = BASE_PATH + "background_images_test/"
+RECT_IMG_PATH_TEST = BASE_PATH + "rect_images_test/"
 
 IMAGE_WIDTH = 256
 IMAGE_HEIGHT = 256
-MAX_RECT_WIDTH = 248
-MAX_RECT_HEIGHT = 248
+MAX_RECT_WIDTH = 240
+MAX_RECT_HEIGHT = 240
 MIN_RECT_WIDTH = 45
 MIN_RECT_HEIGHT = 45
 

@@ -4,6 +4,19 @@ from PIL import Image
 from PIL import ImageDraw
 from PIL import ImageFilter
 import subprocess
+from shapely.geometry import Polygon
+import os
+
+
+def iterate_files(directory):
+    files = []
+    for filename in os.listdir(directory):
+        if filename.lower().endswith(".jpeg") or filename.lower().endswith(".jpg") or filename.lower().endswith(".png"):
+            files.append(os.path.join(directory, filename))
+            continue
+        else:
+            continue
+    return files
 
 
 def display(frame_name, img):
@@ -47,10 +60,13 @@ def resize_img(image, width=None, height=None, inter=cv2.INTER_AREA):
 
     # otherwise, the height is None
     else:
-        # calculate the ratio of the width and construct the
-        # dimensions
-        r = width / float(w)
-        dim = (width, int(h * r))
+        if height is None:
+            # calculate the ratio of the width and construct the
+            # dimensions
+            r = width / float(w)
+            dim = (width, int(h * r))
+        else:
+            dim = (width, height)
 
     # resize the image
     resized = cv2.resize(image, dim, interpolation=inter)
@@ -73,7 +89,7 @@ def blur_img_edges(input_img, radius=6):
 
     # Paste image on white background
     diam = 2 * radius
-    back = Image.new('RGBA', (im.size[0] + diam, im.size[1] + diam), (50, 50, 50, 0))
+    back = Image.new('RGBA', (im.size[0] + diam, im.size[1] + diam), (120, 120, 120, 0))
     back.paste(im, (radius, radius))
 
     # Create paste mask
@@ -90,14 +106,17 @@ def blur_img_edges(input_img, radius=6):
     # Blur image and paste blurred edge according to mask
     blur = back.filter(ImageFilter.GaussianBlur(radius / 2))
     back.paste(blur, mask=mask)
-    return pil2cv(back)
+    return cv2.cvtColor(pil2cv(back), cv2.COLOR_RGBA2BGRA)
 
 
 def add_alpha(rgb_data):
-    rgba = cv2.cvtColor(rgb_data, cv2.COLOR_RGB2RGBA)
-    # Then assign the mask to the last channel of the image
-    rgba[:, :, 3] = 255
-    return rgba
+    try:
+        rgba = cv2.cvtColor(rgb_data, cv2.COLOR_RGB2RGBA)
+        # Then assign the mask to the last channel of the image
+        rgba[:, :, 3] = 255
+        return rgba
+    except:
+        None
 
 
 def save_img(src, dest_path):
@@ -110,21 +129,22 @@ def save_img(src, dest_path):
     cv2.imwrite(dest_path, src)
 
 
-def overlay_transparent(background, overlay, x, y):
+def overlay_transparent(background_src, overlay, x_offset, y_offset):
+    background = background_src.copy()
     background_width = background.shape[1]
     background_height = background.shape[0]
 
-    if x >= background_width or y >= background_height:
+    if x_offset >= background_width or y_offset >= background_height:
         return background
 
     h, w = overlay.shape[0], overlay.shape[1]
 
-    if x + w > background_width:
-        w = background_width - x
+    if x_offset + w > background_width:
+        w = background_width - x_offset
         overlay = overlay[:, :w]
 
-    if y + h > background_height:
-        h = background_height - y
+    if y_offset + h > background_height:
+        h = background_height - y_offset
         overlay = overlay[:h]
 
     if overlay.shape[2] < 4:
@@ -139,7 +159,8 @@ def overlay_transparent(background, overlay, x, y):
     overlay_image = overlay[..., :3]
     mask = overlay[..., 3:] / 255.0
 
-    background[y:y + h, x:x + w] = (1.0 - mask) * background[y:y + h, x:x + w] + mask * overlay_image
+    background[y_offset:y_offset + h, x_offset:x_offset + w] = (1.0 - mask) * background[y_offset:y_offset + h,
+                                                                              x_offset:x_offset + w] + mask * overlay_image
     return background
 
 
@@ -166,11 +187,39 @@ def img_change_perspective(src_img):
     return pil2cv(img)
 
 
-def img_change_perspective2(src_img, distort_upper=150):
+def img_change_perspective2(src_img, distort_upper_left=50, distort_upper_right=50):
     input_img = "temp/input.png"
     output_img = "temp/output.png"
-    distort_upper = str(distort_upper)
+    distort_upper_left = str(distort_upper_left)
+    distort_upper_right = str(distort_upper_right)
     save_img(src_img, input_img)
-    cmd = "magick " + input_img + " -virtual-pixel transparent +distort Perspective \"0,0,0,0  %[fx:w-1],0,%[fx:w-1],0  0,%[fx:h-1],-" + distort_upper + ",%[fx:h-1]  %[fx:w-1],%[fx:h-1],%[fx:w+" + distort_upper + "],%[fx:h-1]\" " + output_img
+    cmd = "magick " + input_img + " -virtual-pixel transparent +distort Perspective \"0,0,0,0  %[fx:w-1],0,%[fx:w-1],0  0,%[fx:h-1],-" + distort_upper_left + ",%[fx:h-1]  %[fx:w-1],%[fx:h-1],%[fx:w+" + distort_upper_right + "],%[fx:h-1]\" " + output_img
     subprocess.call(cmd, shell=True)
     return cv2.imread(output_img, cv2.IMREAD_UNCHANGED)
+
+
+def percentage_intersection(img1, img2, offset_x, offset_y):
+    h1, w1, c1 = img1.shape
+    h2, w2, c2 = img2.shape
+    box_1 = [[0, 0], [w1, 0], [w1, h1], [0, h1]]
+    box_2 = [[0 + offset_x, 0 + offset_y], [w2 + offset_x, 0 + offset_y], [w2 + offset_x, h2 + offset_y],
+             [0 + offset_x, h2 + offset_y]]
+    poly_1 = Polygon(box_1)
+    poly_2 = Polygon(box_2)
+    iou = poly_1.intersection(poly_2).area / poly_2.area
+    return iou
+
+
+def create_blank_img(width, height, rgb_color=(0, 0, 0)):
+    # Create black blank image
+    image = np.zeros((height, width, 3), np.uint8)
+    # Since OpenCV uses BGR, convert the color first
+    color = tuple(reversed(rgb_color))
+    # Fill image with color
+    image[:] = color
+    return image
+
+
+def add_border_to_img(img, border_width=1, color=[255, 255, 255]):
+    top, bottom, left, right = [border_width] * 4
+    return cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)
